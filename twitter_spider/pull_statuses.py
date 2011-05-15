@@ -9,7 +9,9 @@ print "Twitter Spider"
 
 tw_no = 0  #tweet iterator
 
+import httplib2
 import twitter
+
 api = twitter.Api()
 
 atl_status = api.GetUserTimeline("as_te_li")
