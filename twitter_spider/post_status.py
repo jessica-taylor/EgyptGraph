@@ -1,9 +1,8 @@
 #! /usr/bin/env python
 
-# Python script to post to twitter as a given user.
-# Depends on said library, so get it here:
-# http://code.google.com/p/python-twitter/
-# http://code.google.com/p/httplib2/
+# after you've linked this script to your account using the access keys
+# you can post to your account by running 
+#			./post_status.py '<message here>'
 
 import sys
 import tweepy
