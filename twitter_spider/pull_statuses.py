@@ -1,22 +1,25 @@
 #! /usr/bin/env python
 
-# Python script to pull twitter status posts from a given user.
-# Just trying out the python-twitter library.
-# Depends on said library, so get it here:
-# http://code.google.com/p/python-twitter/
+import sys
+import tweepy
 
-print "Twitter Spider"
+CONSUMER_KEY = 'mJ6vPoSPrseFBsE2noKg'
+CONSUMER_SECRET = 'oFxu6wKrWVLRvy2kHzVvPKpEhT9XuSrz6bcmcluDbw'
+## replace the following two lines with what link_acct.py gave you
+ACCESS_KEY = ''
+ACCESS_SECRET = ''
 
-tw_no = 0  #tweet iterator
+tw_no = 0;
+tweet = ""
 
-import httplib2
-import twitter
+auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+auth.set_access_token(ACCESS_KEY, ACCESS_SECRET)
 
-api = twitter.Api()
+api = tweepy.API(auth)
+atl_tweets = api.user_timeline("as_te_li")
 
-atl_status = api.GetUserTimeline("as_te_li")
-
-for s in atl_status:
-	tw_no = tw_no+1
-	print "Tweet #",tw_no,":",s.text,""
+for tweet in atl_tweets:
+	tw_no = tw_no + 1
+	print "No",tw_no,":",tweet.text
+tw_no = 0
 
