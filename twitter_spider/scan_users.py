@@ -12,19 +12,16 @@
 #	The Twitter API is rate limited, therefore trying to fetch statuses from
 #	over 350 users within an hour will cause twitter to block for an hour.
 #
-#	Unicode posts break the file writing mechanism at the moment.
-#
 #	Usage: scan_users.py <username list> <tweet dump target path> <input seek-to line> 
-#		arguments are optional.
+#		
+#	All arguments are optional.
 #	
 
 import sys
 import signal
 import tweepy
-import fileinput
 import time
 import os
-import codecs
 
 # keeping the access key/access secret in a separate file
 # so that each person running this script can easily use their
@@ -43,9 +40,10 @@ import keys
 # possibly having something to do with HTTP libraries' exception
 # handling, so os._exit() is used instead.
 def signal_handler(signal, frame):
-	print "SIGINT caught, exiting. (PID: %d)" % (os.getpid())
-#	tweet_output_file.close()
+	print "\nSIGINT caught, exiting. (PID: %d)" % (os.getpid())
 	username_file_desc.close()
+	if ( user_output_file != 0 ):
+		tweet_output_file.close()
 	os._exit(0)
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -55,30 +53,35 @@ arg_count = 0
 for arg in sys.argv:
 	arg_count = arg_count + 1
 
+# protip for the user if they get it wrong
+if (arg_count < 1 or arg_count > 4):
+	print "\nUsage: %s <username_file (opt)> <tweet_dump_file (opt)> <skip#(opt)>" %(sys.argv[0])
+	os._exit(1)
+
 # set username input file
-if (arg_count == 2):
+if (arg_count > 1):
 	username_file = sys.argv[1].strip()
 else:
 	username_file = "usernames.txt"
 
 # set tweet output file
-if (arg_count == 3):
-	user_output_file = sys.argv[2].strip()
+if (arg_count > 2):
+	user_output_file = str(sys.argv[2].strip())
 else:
 	user_output_file = 0
 
 # set lines in input file to skip (ghetto line seek)
-if (arg_count == 4):
-	skip_to = sys.argv[3].strip()
+if (arg_count > 3):
+	skip_to_input = sys.argv[3].strip()
+	try:
+		skip_to = int(skip_to_input)
+	except:
+		print "Seek-to-line value supplied is not a number. Defaulting to 0."
+		skip_to = 0
 else:
 	skip_to = 0
-cur_line_no = 1
 
-# protip for the user if they get it wrong
-if (arg_count < 1 or arg_count > 4):
-	print "\nUsage: %s <username_file (opt)> <tweet_dump_file (opt)> <skip#(opt)>" %(sys.argv[0])
-	print "Default value for <username_file> is 'usernames.txt'"
-	os._exit(1)
+cur_line_no = 1
 
 print "Using: username_file='%s' output_file='%s' seek-to-line=%s" % (username_file, user_output_file, skip_to)
 
@@ -94,8 +97,9 @@ api = tweepy.API(auth)
 #set up output file if requested
 if ( user_output_file != 0 ):
 	try:
-		#tweet_output_file = codecs.open(user_output_file, encoding='utf-8', mode='w')
-		tweet_output_file = open(user_output_file, mode='w')
+		# to write unicode to disk, we're opening the target in binary mode.
+		# we convert the text to utf-8 before writing it to the target file.
+		tweet_output_file = open(user_output_file, mode='wb')
 	except:
 		print "Could not open specified output file to write, exiting."
 		os._exit(1)
@@ -107,44 +111,57 @@ except:
 	print "Could not open username file, exiting."
 	os._exit(1)
 
-
 ############################# TWEET FETCHING ###############################
-
 # the actual scanning of each user's status' happens here.
 for scan_target in username_file_desc:
-	if( cur_line_no > skip_to ):
+
+	# this test here allows us to skip [skip_to] lines of input file.
+	if( cur_line_no >= skip_to ):
 		username = scan_target.strip()
 
 		try:
 			# pulls down [count] tweets, 
-			user_statuses = api.user_timeline(username, count=3200)
+			user_statuses = api.user_timeline(username, count=1)
 		
+			# loop through each tweet entity data. there's a decent amount of misc. metadata.
+			# location, time zone etc. can be pulled out here. 'status.[metadata_type]'
 			for status in user_statuses:
-				cur_tweet = "At %s, %s said: %s" % (status.created_at, username, status.text)
+				cur_tweet = "date=[%s] username=[%s] text=[%s]" %(status.created_at, username, status.text)
 
-			# write to file specified, else print to screen.
+				# write to specified output file, else throw error.
 				if ( user_output_file != 0 ):
-					try:	# to unicode and back to utf-8
-						tweet_output_file.write(cur_tweet)
+					try:
+						# we have to add a newline, as .encode() doesn't handle those.
+						cur_tweet_utf8 = cur_tweet.encode('utf-8') + "\n" 
+						errcode = tweet_output_file.write(cur_tweet_utf8) 
 					except:
-						print "Huh? Could not write to tweet output file."
+						print "Could not write output file."
 
 				print cur_tweet
 
 		except:
 			print "Oops, %s's posts are unavailable." % (username)
 
-		# used for seek-to-line
-		cur_line_no = cur_line_no + 1
-
 		# this value was chosen to correspond to a maximum request rate of 350/hour
 		# if 350 requests happen, twitter stops responding. Hence 11 second delay.
-		time.sleep(11.0)
+		# time.sleep(11.0)
 
+	# update line cursor	
+	cur_line_no = cur_line_no + 1
 
 
 
 ############################# END OF PROGRAM ############################
+
+# apparently if you don't close out
+# your file descriptors, funny things
+# can happen, like your write operations
+# mysteriously not writing anything.
+username_file_desc.close()
+if ( user_output_file != 0 ):
+	tweet_output_file.close()
+
+os._exit(0)
 
 
 
